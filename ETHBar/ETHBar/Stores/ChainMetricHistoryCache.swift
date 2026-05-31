@@ -1,15 +1,25 @@
 import Foundation
 
 actor ChainMetricHistoryCache {
+    static let defaultRetainedBlockCount = 50_400 //7 days * 24h * 60m * 60s / ~12s per block = 50,400 blocks
+
+
     private let chainID: Int
     private let networkName: String
     private let fileURL: URL
+    private let retainedBlockCount: Int
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    init(chainID: Int, networkName: String, fileURL: URL? = nil) {
+    init(
+        chainID: Int,
+        networkName: String,
+        retainedBlockCount: Int = ChainMetricHistoryCache.defaultRetainedBlockCount,
+        fileURL: URL? = nil
+    ) {
         self.chainID = chainID
         self.networkName = networkName
+        self.retainedBlockCount = retainedBlockCount
         self.fileURL = fileURL ?? Self.defaultFileURL(chainID: chainID)
 
         let decoder = JSONDecoder()
@@ -29,14 +39,14 @@ actor ChainMetricHistoryCache {
 
         let data = try Data(contentsOf: fileURL)
         let history = try decoder.decode(ChainMetricHistory.self, from: data)
-        return Self.normalized(history)
+        return Self.normalized(history, retainedBlockCount: retainedBlockCount)
     }
 
     func saveHistory(_ history: ChainMetricHistory) throws {
         let directoryURL = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
-        let data = try encoder.encode(Self.normalized(history))
+        let data = try encoder.encode(Self.normalized(history, retainedBlockCount: retainedBlockCount))
         try data.write(to: fileURL, options: [.atomic])
     }
 
@@ -49,21 +59,35 @@ actor ChainMetricHistoryCache {
             networkName: existingHistory.networkName,
             points: existingHistory.points + newPoints
         )
-//        normalized does:
-//            dedupe by blockNumber
-//            sort by blockNumber
-        return Self.normalized(mergedHistory)
+        return Self.normalized(mergedHistory, retainedBlockCount: retainedBlockCount)
     }
 
-    private nonisolated static func normalized(_ history: ChainMetricHistory) -> ChainMetricHistory {
+    private nonisolated static func normalized(
+        _ history: ChainMetricHistory,
+        retainedBlockCount: Int
+    ) -> ChainMetricHistory {
         let pointsByBlock = Dictionary(history.points.map { ($0.blockNumber, $0) }, uniquingKeysWith: { _, newest in newest })
         let sortedPoints = pointsByBlock.values.sorted { $0.blockNumber < $1.blockNumber }
+        let retainedPoints = Self.retainedPoints(sortedPoints, retainedBlockCount: retainedBlockCount)
 
         return ChainMetricHistory(
             chainID: history.chainID,
             networkName: history.networkName,
-            points: sortedPoints
+            points: retainedPoints
         )
+    }
+
+    private nonisolated static func retainedPoints(
+        _ sortedPoints: [ChainMetricPoint],
+        retainedBlockCount: Int
+    ) -> [ChainMetricPoint] {
+        guard retainedBlockCount > 0,
+              let latestBlockNumber = sortedPoints.last?.blockNumber else {
+            return sortedPoints
+        }
+
+        let oldestRetainedBlockNumber = latestBlockNumber - retainedBlockCount + 1
+        return sortedPoints.filter { $0.blockNumber >= oldestRetainedBlockNumber }
     }
 
     private nonisolated static func defaultFileURL(chainID: Int) -> URL {

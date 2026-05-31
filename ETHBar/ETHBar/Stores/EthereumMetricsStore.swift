@@ -15,13 +15,12 @@ final class EthereumMetricsStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
-    private let provider: any EthereumMetricsProvider
+    private let provider: any ChainMetricsProvider
     private let historyCache: ChainMetricHistoryCache
-    private var historyLoadTask: Task<Void, Never>?
     private var liveUpdatesTask: Task<Void, Never>?
 
     init(
-        provider: (any EthereumMetricsProvider)? = nil,
+        provider: (any ChainMetricsProvider)? = nil,
         historyCache: ChainMetricHistoryCache = ChainMetricHistoryCache(
             chainID: EthereumNetwork.mainnet.chainID,
             networkName: EthereumNetwork.mainnet.name
@@ -30,8 +29,6 @@ final class EthereumMetricsStore: ObservableObject {
     ) {
         self.provider = provider ?? PublicNodeMetricsProvider()
         self.historyCache = historyCache
-
-        loadCachedHistory()
 
         if autostart {
             startLiveUpdates()
@@ -51,7 +48,7 @@ final class EthereumMetricsStore: ObservableObject {
             return
         }
 
-//        ETHBarLog.debug("Live updates started", category: .store)
+        ETHBarLog.debug("Live updates started", category: .store)
         isLoading = true
         errorMessage = nil
 
@@ -60,11 +57,14 @@ final class EthereumMetricsStore: ObservableObject {
                 return
             }
 
+            await loadCachedHistory()
+            await syncHistory()
+
             do {
                 for try await nextMetrics in provider.subscribeToMetrics() {
                     metrics = nextMetrics
                     isLoading = false
-//                    ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
+                    ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
                 }
             } catch {
                 isLoading = false
@@ -75,32 +75,25 @@ final class EthereumMetricsStore: ObservableObject {
     }
 
     func stopLiveUpdates() {
-//        ETHBarLog.debug("Live updates stopped", category: .store)
+        ETHBarLog.debug("Live updates stopped", category: .store)
         liveUpdatesTask?.cancel()
         liveUpdatesTask = nil
     }
 
-    private func loadCachedHistory() {
-        historyLoadTask?.cancel()
-        historyLoadTask = Task { @MainActor [weak self] in
-            guard let self else {
+    private func loadCachedHistory() async {
+        do {
+            let cachedHistory = try await historyCache.loadHistory()
+            guard !Task.isCancelled else {
                 return
             }
 
-            do {
-                let cachedHistory = try await historyCache.loadHistory()
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                history = cachedHistory
-                ETHBarLog.debug(
-                    "Loaded \(cachedHistory.points.count) cached history points for chain \(cachedHistory.chainID)",
-                    category: .store
-                )
-            } catch {
-                ETHBarLog.debug("History cache load failed: \(error.localizedDescription)", category: .store)
-            }
+            history = cachedHistory
+            ETHBarLog.debug(
+                "Loaded \(cachedHistory.points.count) cached history points for chain \(cachedHistory.chainID)",
+                category: .store
+            )
+        } catch {
+            ETHBarLog.debug("History cache load failed: \(error.localizedDescription)", category: .store)
         }
     }
 
@@ -111,5 +104,78 @@ final class EthereumMetricsStore: ObservableObject {
         formatter.numberStyle = .decimal
         return formatter
     }()
+    
+//    Missing older part of target window -> Fetch whole 7-day target window.
+//    Otherwise, only missing newest blocks -> Fetch just newest missing blocks.
+//    Already covers target window -> Fetch nothing.
+    private func syncHistory() async {
+        do {
+            guard !Task.isCancelled else {
+                return
+            }
+
+            let currentHead = try await provider.currentBlockNumber()
+            let targetBlockCount = ChainMetricHistoryCache.defaultRetainedBlockCount
+            let targetStartBlock = max(0, currentHead - targetBlockCount + 1)
+
+            let fetchStartBlock: Int //optimize later, I think blocks "near' the first and last block should be fine
+            if let firstBlock = history.firstBlockNumber,
+               let lastBlock = history.lastBlockNumber {
+                let needsOlderHistory = firstBlock > targetStartBlock
+                let needsNewerHistory = lastBlock < currentHead
+
+                guard needsOlderHistory || needsNewerHistory else {
+                    ETHBarLog.debug("History already covers target block window", category: .store)
+                    return
+                }
+
+                fetchStartBlock = needsOlderHistory ? targetStartBlock : lastBlock + 1
+            } else {
+                fetchStartBlock = targetStartBlock
+            }
+
+            let blockCount = currentHead - fetchStartBlock + 1
+            guard blockCount > 0 else { return }
+
+            let maxFeeHistoryBlockCount = 1024
+
+            var allPoints: [ChainMetricPoint] = []
+            var chunkStart = fetchStartBlock
+
+            while chunkStart <= currentHead {
+                let chunkEnd = min(chunkStart + maxFeeHistoryBlockCount - 1, currentHead)
+                let chunkBlockCount = chunkEnd - chunkStart + 1
+
+                let chunkPoints = try await provider.feeHistory(
+                    blockCount: chunkBlockCount,
+                    newestBlock: chunkEnd
+                )
+
+                allPoints.append(contentsOf: chunkPoints)
+                chunkStart = chunkEnd + 1
+            }
+
+            let mergedHistory = await historyCache.mergedHistory(
+                existingHistory: history,
+                newPoints: allPoints
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+
+            history = mergedHistory
+            try await historyCache.saveHistory(mergedHistory)
+
+            ETHBarLog.debug(
+                "Saved \(mergedHistory.points.count) history points",
+                category: .store
+            )
+        } catch {
+            ETHBarLog.debug(
+                "Fee history fetch failed: \(error.localizedDescription)",
+                category: .store
+            )
+        }
+    }
 
 }

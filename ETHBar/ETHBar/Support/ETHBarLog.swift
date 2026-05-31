@@ -4,10 +4,11 @@ enum ETHBarLog {
     enum Category: String {
         case provider = "Provider"
         case store = "Store"
+        case http = "HTTP"
         case webSocket = "WS"
     }
 
-    static func debug(_ message: String, category: Category, separated: Bool = false) {
+    static func debug(_ message: String, category: Category, separated: Bool = true) {
         #if DEBUG
         let output = "[ETHBar][\(category.rawValue)] \(message)"
 
