@@ -39,9 +39,6 @@ struct ContentView: View {
         }
         .padding(18)
         .frame(width: 320)
-        .task {
-            await store.refresh()
-        }
     }
 
     private var header: some View {

@@ -11,9 +11,13 @@ final class EthereumMetricsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let provider: any EthereumMetricsProvider
+    private var pollingTask: Task<Void, Never>?
+    private let refreshInterval: Duration
 
-    init(provider: (any EthereumMetricsProvider)? = nil) {
+    init(provider: (any EthereumMetricsProvider)? = nil, refreshInterval: Duration = .seconds(12)) {
         self.provider = provider ?? PublicRPCMetricsProvider()
+        self.refreshInterval = refreshInterval
+        startPolling()
     }
 
     var menuBarTitle: String {
@@ -25,6 +29,11 @@ final class EthereumMetricsStore: ObservableObject {
     }
 
     func refresh() async {
+        guard !isLoading else {
+            debugLog("Refresh skipped because another refresh is already in progress")
+            return
+        }
+
         debugLog("Refresh started")
         isLoading = true
         errorMessage = nil
@@ -39,6 +48,31 @@ final class EthereumMetricsStore: ObservableObject {
 
         isLoading = false
         debugLog("Refresh finished")
+    }
+
+    func startPolling() {
+        guard pollingTask == nil else {
+            return
+        }
+
+        debugLog("Polling started")
+        pollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refresh()
+
+                do {
+                    try await Task.sleep(for: self?.refreshInterval ?? .seconds(12))
+                } catch {
+                    break
+                }
+            }
+        }
+    }
+
+    func stopPolling() {
+        debugLog("Polling stopped")
+        pollingTask?.cancel()
+        pollingTask = nil
     }
 
     private static let gweiFormatter: NumberFormatter = {
