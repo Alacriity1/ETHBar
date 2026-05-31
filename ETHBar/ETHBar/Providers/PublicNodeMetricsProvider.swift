@@ -2,17 +2,15 @@ import Foundation
 
 //This is the first concrete provider
 
-struct PublicRPCMetricsProvider: EthereumMetricsProvider {
+struct PublicNodeMetricsProvider: EthereumMetricsProvider {
     let network: EthereumNetwork
 
     var sourceName: String {
-        "PublicNode RPC"
+        "PublicNode WebSocket"
     }
 
     init(network: EthereumNetwork = .mainnet) {
-        print("--- RPCProvider init")
         self.network = network
-//        print("network: \(network)")
     }
 
     func subscribeToMetrics() -> AsyncThrowingStream<EthereumMetrics, Error> {
@@ -31,7 +29,7 @@ struct PublicRPCMetricsProvider: EthereumMetricsProvider {
                             sourceName: sourceName
                         )
 
-                        debugLog("Metrics from block header: \(metrics)")
+                        ETHBarLog.debug("Metrics from block header: \(metrics)", category: .provider)
                         continuation.yield(metrics)
                     }
                 } catch {
@@ -43,11 +41,5 @@ struct PublicRPCMetricsProvider: EthereumMetricsProvider {
                 task.cancel()
             }
         }
-    }
-
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[ETHBar][Provider] \(message)")
-        #endif
     }
 }

@@ -13,16 +13,11 @@ struct EthereumBlockSubscriptionClient {
                     webSocketTask.resume()
 
                     let request = JSONRPCSubscriptionRequest()
-//                    print("--- request: \(request)")
                     let requestData = try JSONEncoder().encode(request)
                     let requestText = String(data: requestData, encoding: .utf8) ?? ""
-                    
-//                    print("--- requestData: \(requestData)")
-//                    
-//                    print("---reqestText: '\(requestText)")
 
-                    debugLog("WS connecting -> \(endpointURL.absoluteString)")
-                    debugLog("WS subscribe body: \(requestText)")
+                    ETHBarLog.debug("WS connecting -> \(endpointURL.absoluteString)", category: .webSocket, separated: true)
+                    ETHBarLog.debug("WS subscribe body: \(requestText)", category: .webSocket, separated: true)
 
                     try await webSocketTask.send(.string(requestText))
 
@@ -30,15 +25,15 @@ struct EthereumBlockSubscriptionClient {
                         let message = try await webSocketTask.receive()
                         let text = try Self.text(from: message)
 
-                        debugLog("WS raw message: \(text)") //First response is a generic confirmation result data
+                        ETHBarLog.debug("WS raw message: \(text)", category: .webSocket, separated: true) // First response is a generic confirmation result data
 
                         if let blockHeader = try Self.blockHeader(from: text) {
-                            debugLog("WS new block: \(blockHeader.number)")
-                            continuation.yield(blockHeader) // consumed by the for try await loop in PublicRPCMetricsProvider.swift
+                            ETHBarLog.debug("WS new block: \(blockHeader.number)", category: .webSocket, separated: true)
+                            continuation.yield(blockHeader) // consumed by the for try await loop in PublicNodeMetricsProvider.swift
                         }
                     }
                 } catch {
-                    debugLog("WS failed: \(error.localizedDescription)")
+                    ETHBarLog.debug("WS failed: \(error.localizedDescription)", category: .webSocket, separated: true)
                     continuation.finish(throwing: error)
                 }
             }
@@ -93,14 +88,6 @@ struct EthereumBlockSubscriptionClient {
         }
 
         return parsed
-    }
-
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("------------------")
-        print("[ETHBar][WS] \(message)")
-        print("------------------")
-        #endif
     }
 }
 

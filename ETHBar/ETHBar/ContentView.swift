@@ -111,6 +111,6 @@ private struct MetricRow: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(store: EthereumMetricsStore())
+        ContentView(store: EthereumMetricsStore(autostart: false))
     }
 }

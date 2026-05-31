@@ -13,9 +13,12 @@ final class EthereumMetricsStore: ObservableObject {
     private let provider: any EthereumMetricsProvider
     private var liveUpdatesTask: Task<Void, Never>?
 
-    init(provider: (any EthereumMetricsProvider)? = nil) {
-        self.provider = provider ?? PublicRPCMetricsProvider()
-        startLiveUpdates()
+    init(provider: (any EthereumMetricsProvider)? = nil, autostart: Bool = true) {
+        self.provider = provider ?? PublicNodeMetricsProvider()
+
+        if autostart {
+            startLiveUpdates()
+        }
     }
 
     var menuBarTitle: String {
@@ -31,7 +34,7 @@ final class EthereumMetricsStore: ObservableObject {
             return
         }
 
-        debugLog("Live updates started")
+        ETHBarLog.debug("Live updates started", category: .store)
         isLoading = true
         errorMessage = nil
 
@@ -44,18 +47,18 @@ final class EthereumMetricsStore: ObservableObject {
                 for try await nextMetrics in provider.subscribeToMetrics() {
                     metrics = nextMetrics
                     isLoading = false
-                    debugLog("Live metrics received: \(nextMetrics)")
+                    ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
                 }
             } catch {
                 isLoading = false
                 errorMessage = error.localizedDescription
-                debugLog("Live updates failed: \(error.localizedDescription)")
+                ETHBarLog.debug("Live updates failed: \(error.localizedDescription)", category: .store)
             }
         }
     }
 
     func stopLiveUpdates() {
-        debugLog("Live updates stopped")
+        ETHBarLog.debug("Live updates stopped", category: .store)
         liveUpdatesTask?.cancel()
         liveUpdatesTask = nil
     }
@@ -68,9 +71,4 @@ final class EthereumMetricsStore: ObservableObject {
         return formatter
     }()
 
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[ETHBar][Store] \(message)")
-        #endif
-    }
 }
