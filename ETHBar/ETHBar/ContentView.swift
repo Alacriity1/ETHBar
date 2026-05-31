@@ -109,6 +109,7 @@ private struct MetricRow: View {
     }
 }
 
+//For Xcode’s SwiftUI preview canvas.
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView(store: EthereumMetricsStore(autostart: false))

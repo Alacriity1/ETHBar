@@ -1,7 +1,5 @@
 import Foundation
 
-//This is the first concrete provider
-
 struct PublicNodeMetricsProvider: EthereumMetricsProvider {
     let network: EthereumNetwork
 
@@ -14,7 +12,7 @@ struct PublicNodeMetricsProvider: EthereumMetricsProvider {
     }
 
     func subscribeToMetrics() -> AsyncThrowingStream<EthereumMetrics, Error> {
-        let client = EthereumBlockSubscriptionClient(endpointURL: network.webSocketURL)
+        let client = SubscriptionClient(endpointURL: network.webSocketURL)
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -29,7 +27,7 @@ struct PublicNodeMetricsProvider: EthereumMetricsProvider {
                             sourceName: sourceName
                         )
 
-                        ETHBarLog.debug("Metrics from block header: \(metrics)", category: .provider)
+//                        ETHBarLog.debug("Metrics from block header: \(metrics)", category: .provider)
                         continuation.yield(metrics)
                     }
                 } catch {

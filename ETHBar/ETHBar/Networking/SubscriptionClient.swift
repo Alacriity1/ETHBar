@@ -1,6 +1,6 @@
 import Foundation
 
-struct EthereumBlockSubscriptionClient {
+struct SubscriptionClient {
     let endpointURL: URL
     var session: URLSession = .shared
 
@@ -16,8 +16,8 @@ struct EthereumBlockSubscriptionClient {
                     let requestData = try JSONEncoder().encode(request)
                     let requestText = String(data: requestData, encoding: .utf8) ?? ""
 
-                    ETHBarLog.debug("WS connecting -> \(endpointURL.absoluteString)", category: .webSocket, separated: true)
-                    ETHBarLog.debug("WS subscribe body: \(requestText)", category: .webSocket, separated: true)
+//                    ETHBarLog.debug("WS connecting -> \(endpointURL.absoluteString)", category: .webSocket, separated: true)
+//                    ETHBarLog.debug("WS subscribe body: \(requestText)", category: .webSocket, separated: true)
 
                     try await webSocketTask.send(.string(requestText))
 
@@ -25,10 +25,10 @@ struct EthereumBlockSubscriptionClient {
                         let message = try await webSocketTask.receive()
                         let text = try Self.text(from: message)
 
-                        ETHBarLog.debug("WS raw message: \(text)", category: .webSocket, separated: true) // First response is a generic confirmation result data
+//                        ETHBarLog.debug("WS raw message: \(text)", category: .webSocket, separated: true) // First response is a generic confirmation result data
 
                         if let blockHeader = try Self.blockHeader(from: text) {
-                            ETHBarLog.debug("WS new block: \(blockHeader.number)", category: .webSocket, separated: true)
+//                            ETHBarLog.debug("WS new block: \(blockHeader.number)", category: .webSocket, separated: true)
                             continuation.yield(blockHeader) // consumed by the for try await loop in PublicNodeMetricsProvider.swift
                         }
                     }

@@ -1,20 +1,37 @@
 import Combine
 import Foundation
 
-// app state layer
+//app state layer
 //Purpose: keep async loading, errors, formatting, and observable UI state out of the provider and out of the view. The view just observes the store.
 
 @MainActor
 final class EthereumMetricsStore: ObservableObject {
     @Published private(set) var metrics: EthereumMetrics = .placeholder
+    @Published private(set) var history = ChainMetricHistory(
+        chainID: EthereumNetwork.mainnet.chainID,
+        networkName: EthereumNetwork.mainnet.name,
+        points: []
+    )
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
     private let provider: any EthereumMetricsProvider
+    private let historyCache: ChainMetricHistoryCache
+    private var historyLoadTask: Task<Void, Never>?
     private var liveUpdatesTask: Task<Void, Never>?
 
-    init(provider: (any EthereumMetricsProvider)? = nil, autostart: Bool = true) {
+    init(
+        provider: (any EthereumMetricsProvider)? = nil,
+        historyCache: ChainMetricHistoryCache = ChainMetricHistoryCache(
+            chainID: EthereumNetwork.mainnet.chainID,
+            networkName: EthereumNetwork.mainnet.name
+        ),
+        autostart: Bool = true
+    ) {
         self.provider = provider ?? PublicNodeMetricsProvider()
+        self.historyCache = historyCache
+
+        loadCachedHistory()
 
         if autostart {
             startLiveUpdates()
@@ -34,7 +51,7 @@ final class EthereumMetricsStore: ObservableObject {
             return
         }
 
-        ETHBarLog.debug("Live updates started", category: .store)
+//        ETHBarLog.debug("Live updates started", category: .store)
         isLoading = true
         errorMessage = nil
 
@@ -47,7 +64,7 @@ final class EthereumMetricsStore: ObservableObject {
                 for try await nextMetrics in provider.subscribeToMetrics() {
                     metrics = nextMetrics
                     isLoading = false
-                    ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
+//                    ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
                 }
             } catch {
                 isLoading = false
@@ -58,9 +75,33 @@ final class EthereumMetricsStore: ObservableObject {
     }
 
     func stopLiveUpdates() {
-        ETHBarLog.debug("Live updates stopped", category: .store)
+//        ETHBarLog.debug("Live updates stopped", category: .store)
         liveUpdatesTask?.cancel()
         liveUpdatesTask = nil
+    }
+
+    private func loadCachedHistory() {
+        historyLoadTask?.cancel()
+        historyLoadTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let cachedHistory = try await historyCache.loadHistory()
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                history = cachedHistory
+                ETHBarLog.debug(
+                    "Loaded \(cachedHistory.points.count) cached history points for chain \(cachedHistory.chainID)",
+                    category: .store
+                )
+            } catch {
+                ETHBarLog.debug("History cache load failed: \(error.localizedDescription)", category: .store)
+            }
+        }
     }
 
     private static let gweiFormatter: NumberFormatter = {
