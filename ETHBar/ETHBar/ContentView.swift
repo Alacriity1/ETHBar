@@ -2,23 +2,33 @@ import AppKit
 import SwiftUI
 
 struct ContentView: View {
+    @ObservedObject var store: EthereumMetricsStore
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
 
             Divider()
 
-            MetricRow(title: "Base fee", value: "18 gwei", systemImage: "fuelpump")
-            MetricRow(title: "Priority fee", value: "2 gwei", systemImage: "arrow.up.forward.circle")
-            MetricRow(title: "Block", value: "Pending", systemImage: "cube")
+            MetricRow(title: "Gas price", value: gasPriceText, systemImage: "fuelpump")
+            MetricRow(title: "Block", value: blockNumberText, systemImage: "cube")
             MetricRow(title: "Transactions/sec", value: "--", systemImage: "waveform.path.ecg")
+
+            if let errorMessage = store.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
 
             Divider()
 
             HStack {
                 Button("Refresh") {
-                    // Live Ethereum metric refresh will land with the data provider layer.
+                    Task {
+                        await store.refresh()
+                    }
                 }
+                .disabled(store.isLoading)
 
                 Spacer()
 
@@ -29,6 +39,9 @@ struct ContentView: View {
         }
         .padding(18)
         .frame(width: 320)
+        .task {
+            await store.refresh()
+        }
     }
 
     private var header: some View {
@@ -36,17 +49,45 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ETHBar")
                     .font(.headline)
-                Text("Ethereum network")
+                Text(store.metrics.networkName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text("Updated just now")
+            Text(lastUpdatedText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var gasPriceText: String {
+        guard store.metrics.gasPriceGwei > 0 else {
+            return store.isLoading ? "Loading" : "--"
+        }
+
+        return "\(store.metrics.gasPriceGwei.formatted(.number.precision(.fractionLength(0...1)))) gwei"
+    }
+
+    private var blockNumberText: String {
+        guard store.metrics.blockNumber > 0 else {
+            return "--"
+        }
+
+        return store.metrics.blockNumber.formatted()
+    }
+
+    private var lastUpdatedText: String {
+        if store.isLoading {
+            return "Updating"
+        }
+
+        guard store.metrics.sourceName != "Not loaded" else {
+            return "Not loaded"
+        }
+
+        return store.metrics.updatedAt.formatted(date: .omitted, time: .shortened)
     }
 }
 
@@ -76,6 +117,6 @@ private struct MetricRow: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        ContentView(store: EthereumMetricsStore())
     }
 }

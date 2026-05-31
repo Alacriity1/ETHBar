@@ -1,12 +1,14 @@
 import SwiftUI
 
-@main
+@main //app root
 struct ETHBarApp: App {
+    @StateObject private var metricsStore = EthereumMetricsStore()
+
     var body: some Scene {
         MenuBarExtra {
-            ContentView()
+            ContentView(store: metricsStore)
         } label: {
-            Label("ETH 18 gwei", systemImage: "bolt.circle")
+            Label(metricsStore.menuBarTitle, systemImage: "bolt.circle")
         }
         .menuBarExtraStyle(.window)
     }
