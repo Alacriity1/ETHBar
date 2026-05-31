@@ -10,27 +10,39 @@ struct PublicRPCMetricsProvider: EthereumMetricsProvider {
     }
 
     init(network: EthereumNetwork = .mainnet) {
+        print("--- RPCProvider init")
         self.network = network
+//        print("network: \(network)")
     }
 
-    func fetchMetrics() async throws -> EthereumMetrics {
-        debugLog("Fetching metrics for \(network.name) from \(network.rpcURL.absoluteString)")
+    func subscribeToMetrics() -> AsyncThrowingStream<EthereumMetrics, Error> {
+        let client = EthereumBlockSubscriptionClient(endpointURL: network.webSocketURL)
 
-        let client = EthereumRPCClient(endpointURL: network.rpcURL)
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await header in client.blockHeaders() {
+                        let metrics = EthereumMetrics(
+                            networkName: network.name,
+                            baseFeeGwei: header.baseFeePerGasGwei,
+                            blockNumber: header.number,
+                            gasUsedPercent: header.gasUsedPercent,
+                            updatedAt: header.timestamp,
+                            sourceName: sourceName
+                        )
 
-        async let gasPriceWei = client.gasPriceWei()
-        async let blockNumber = client.blockNumber()
+                        debugLog("Metrics from block header: \(metrics)")
+                        continuation.yield(metrics)
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
 
-        let metrics = EthereumMetrics(
-            networkName: network.name,
-            gasPriceGwei: Double(try await gasPriceWei) / 1_000_000_000,
-            blockNumber: try await blockNumber,
-            updatedAt: Date(),
-            sourceName: sourceName
-        )
-
-        debugLog("Fetched metrics: gas=\(metrics.gasPriceGwei) gwei block=\(metrics.blockNumber)")
-        return metrics
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
     }
 
     private func debugLog(_ message: String) {

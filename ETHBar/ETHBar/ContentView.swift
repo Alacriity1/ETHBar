@@ -10,9 +10,9 @@ struct ContentView: View {
 
             Divider()
 
-            MetricRow(title: "Gas price", value: gasPriceText, systemImage: "fuelpump")
+            MetricRow(title: "Base fee", value: baseFeeText, systemImage: "fuelpump")
             MetricRow(title: "Block", value: blockNumberText, systemImage: "cube")
-            MetricRow(title: "Transactions/sec", value: "--", systemImage: "waveform.path.ecg")
+            MetricRow(title: "Gas used", value: gasUsedText, systemImage: "gauge.with.dots.needle.bottom.50percent")
 
             if let errorMessage = store.errorMessage {
                 Text(errorMessage)
@@ -22,19 +22,8 @@ struct ContentView: View {
 
             Divider()
 
-            HStack {
-                Button("Refresh") {
-                    Task {
-                        await store.refresh()
-                    }
-                }
-                .disabled(store.isLoading)
-
-                Spacer()
-
-                Button("Quit") {
-                    NSApplication.shared.terminate(nil)
-                }
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
             }
         }
         .padding(18)
@@ -59,12 +48,12 @@ struct ContentView: View {
         }
     }
 
-    private var gasPriceText: String {
-        guard store.metrics.gasPriceGwei > 0 else {
+    private var baseFeeText: String {
+        guard store.metrics.baseFeeGwei > 0 else {
             return store.isLoading ? "Loading" : "--"
         }
 
-        return "\(store.metrics.gasPriceGwei.formatted(.number.precision(.fractionLength(0...1)))) gwei"
+        return "\(store.metrics.baseFeeGwei.formatted(.number.precision(.fractionLength(0...3)))) gwei"
     }
 
     private var blockNumberText: String {
@@ -73,6 +62,14 @@ struct ContentView: View {
         }
 
         return store.metrics.blockNumber.formatted()
+    }
+
+    private var gasUsedText: String {
+        guard store.metrics.gasUsedPercent > 0 else {
+            return "--"
+        }
+
+        return store.metrics.gasUsedPercent.formatted(.percent.precision(.fractionLength(0...1)))
     }
 
     private var lastUpdatedText: String {

@@ -4,17 +4,19 @@ import Foundation
 
 struct EthereumMetrics: Equatable {
     let networkName: String
-    let gasPriceGwei: Double
+    let baseFeeGwei: Double
     let blockNumber: Int
+    let gasUsedPercent: Double
     let updatedAt: Date
     let sourceName: String
 }
 
 extension EthereumMetrics {
     static let placeholder = EthereumMetrics(
-        networkName: "Ethereum Mainnet",
-        gasPriceGwei: 0,
+        networkName: "N/A",
+        baseFeeGwei: 0,
         blockNumber: 0,
+        gasUsedPercent: 0,
         updatedAt: Date(),
         sourceName: "Not loaded"
     )

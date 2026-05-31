@@ -11,73 +11,58 @@ final class EthereumMetricsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let provider: any EthereumMetricsProvider
-    private var pollingTask: Task<Void, Never>?
-    private let refreshInterval: Duration
+    private var liveUpdatesTask: Task<Void, Never>?
 
-    init(provider: (any EthereumMetricsProvider)? = nil, refreshInterval: Duration = .seconds(12)) {
+    init(provider: (any EthereumMetricsProvider)? = nil) {
         self.provider = provider ?? PublicRPCMetricsProvider()
-        self.refreshInterval = refreshInterval
-        startPolling()
+        startLiveUpdates()
     }
 
     var menuBarTitle: String {
-        guard metrics.gasPriceGwei > 0 else {
+        guard metrics.baseFeeGwei > 0 else {
             return "ETH --"
         }
 
-        return "ETH \(Self.gweiFormatter.string(from: metrics.gasPriceGwei as NSNumber) ?? "--") gwei"
+        return "ETH \(Self.gweiFormatter.string(from: metrics.baseFeeGwei as NSNumber) ?? "--") gwei"
     }
 
-    func refresh() async {
-        guard !isLoading else {
-            debugLog("Refresh skipped because another refresh is already in progress")
+    func startLiveUpdates() {
+        guard liveUpdatesTask == nil else {
             return
         }
 
-        debugLog("Refresh started")
+        debugLog("Live updates started")
         isLoading = true
         errorMessage = nil
 
-        do {
-            metrics = try await provider.fetchMetrics()
-            debugLog("Refresh succeeded: \(metrics)")
-        } catch {
-            errorMessage = error.localizedDescription
-            debugLog("Refresh failed: \(error.localizedDescription)")
-        }
+        liveUpdatesTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
 
-        isLoading = false
-        debugLog("Refresh finished")
-    }
-
-    func startPolling() {
-        guard pollingTask == nil else {
-            return
-        }
-
-        debugLog("Polling started")
-        pollingTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refresh()
-
-                do {
-                    try await Task.sleep(for: self?.refreshInterval ?? .seconds(12))
-                } catch {
-                    break
+            do {
+                for try await nextMetrics in provider.subscribeToMetrics() {
+                    metrics = nextMetrics
+                    isLoading = false
+                    debugLog("Live metrics received: \(nextMetrics)")
                 }
+            } catch {
+                isLoading = false
+                errorMessage = error.localizedDescription
+                debugLog("Live updates failed: \(error.localizedDescription)")
             }
         }
     }
 
-    func stopPolling() {
-        debugLog("Polling stopped")
-        pollingTask?.cancel()
-        pollingTask = nil
+    func stopLiveUpdates() {
+        debugLog("Live updates stopped")
+        liveUpdatesTask?.cancel()
+        liveUpdatesTask = nil
     }
 
     private static let gweiFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
-        formatter.maximumFractionDigits = 1
+        formatter.maximumFractionDigits = 3
         formatter.minimumFractionDigits = 0
         formatter.numberStyle = .decimal
         return formatter

@@ -5,5 +5,5 @@ import Foundation
 protocol EthereumMetricsProvider {
     var sourceName: String { get }
 
-    func fetchMetrics() async throws -> EthereumMetrics
+    func subscribeToMetrics() -> AsyncThrowingStream<EthereumMetrics, Error>
 }
