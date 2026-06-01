@@ -10,6 +10,10 @@ struct ContentView: View {
 
             Divider()
 
+            BaseFeeHistoryView(points: store.history.points)
+
+            Divider()
+
             MetricRow(title: "Base fee", value: baseFeeText, systemImage: "fuelpump")
             MetricRow(title: "Block", value: blockNumberText, systemImage: "cube")
             MetricRow(title: "Gas used", value: gasUsedText, systemImage: "gauge.with.dots.needle.bottom.50percent")
