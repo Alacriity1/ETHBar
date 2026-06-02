@@ -6,29 +6,28 @@ struct BaseFeeHistoryView: View {
     @State private var highlightedBucket: HighlightedBaseFeeBucket?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             header
             chart
         }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Base fee history")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+        HStack(alignment: .top) {
+            Label {
+                Text("Price")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+            } icon: {
+                Image(systemName: "fuelpump")
+                    .font(.caption)
+            }
+            .foregroundStyle(.primary)
 
             Spacer()
 
             if let summary {
-                Text(
-                    "peak \(formatGwei(summary.peakBaseFeeGwei))  avg \(formatGwei(summary.averageBaseFeeGwei))"
-                )
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-                    .lineLimit(1)
+                BaseFeeHeaderStats(summary: summary)
             }
         }
     }
@@ -195,6 +194,8 @@ struct BaseFeeHistoryView: View {
             lineWidth: 1
         )
 
+        drawLatestMarker(context: context, size: size, model: model)
+
         if let highlightedBucket {
             drawHighlight(
                 context: context,
@@ -202,10 +203,6 @@ struct BaseFeeHistoryView: View {
                 height: size.height
             )
         }
-    }
-
-    private func formatGwei(_ value: Double) -> String {
-        "\(value.formatted(.number.precision(.fractionLength(0...2)))) gwei"
     }
 
     private func highlightedBucket(
@@ -232,6 +229,42 @@ struct BaseFeeHistoryView: View {
                 x: CGFloat(bucketIndex) * model.stepWidth + (model.barWidth / 2),
                 y: size.height - barHeight
             )
+        )
+    }
+
+    private func drawLatestMarker(
+        context: GraphicsContext,
+        size: CGSize,
+        model: BaseFeeChartModel
+    ) {
+        guard let latestBucket = model.buckets.last else {
+            return
+        }
+
+        let drawableHeight = max(1, size.height - 4)
+        let normalizedHeight = latestBucket.peakBaseFeeGwei / model.scaleMax
+        let barHeight = max(1, drawableHeight * normalizedHeight)
+        let x = CGFloat(model.buckets.count - 1) * model.stepWidth + (model.barWidth / 2)
+        let y = size.height - barHeight
+
+        var markerLine = Path()
+        markerLine.move(to: CGPoint(x: x, y: 0))
+        markerLine.addLine(to: CGPoint(x: x, y: size.height))
+        context.stroke(
+            markerLine,
+            with: .color(.primary.opacity(0.18)),
+            lineWidth: 1
+        )
+
+        let markerRect = CGRect(
+            x: x - 1.5,
+            y: y - 1.5,
+            width: 3,
+            height: 3
+        )
+        context.fill(
+            Path(ellipseIn: markerRect),
+            with: .color(.primary.opacity(0.76))
         )
     }
 
@@ -299,7 +332,9 @@ struct BaseFeeHistoryView: View {
             .map(\.baseFeeGwei)
             .filter { $0 > 0 }
 
-        guard let peakBaseFeeGwei = fees.max(), !fees.isEmpty else {
+        guard let peakBaseFeeGwei = fees.max(),
+              let lowBaseFeeGwei = fees.min(),
+              !fees.isEmpty else {
             return nil
         }
 
@@ -307,7 +342,8 @@ struct BaseFeeHistoryView: View {
 
         return BaseFeeSummary(
             peakBaseFeeGwei: peakBaseFeeGwei,
-            averageBaseFeeGwei: averageBaseFeeGwei
+            averageBaseFeeGwei: averageBaseFeeGwei,
+            lowBaseFeeGwei: lowBaseFeeGwei
         )
     }
 
@@ -367,6 +403,52 @@ private struct HighlightedBaseFeeBucket {
 private struct BaseFeeSummary {
     let peakBaseFeeGwei: Double
     let averageBaseFeeGwei: Double
+    let lowBaseFeeGwei: Double
+}
+
+private struct BaseFeeHeaderStats: View {
+    let summary: BaseFeeSummary
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("peak")
+                    .font(.caption2)
+                    .foregroundStyle(.primary)
+
+                Text(format(summary.peakBaseFeeGwei))
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                stat(label: "avg", value: summary.averageBaseFeeGwei)
+                stat(label: "low", value: summary.lowBaseFeeGwei)
+            }
+        }
+    }
+
+    private func stat(label: String, value: Double) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            Text(format(value))
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private func format(_ value: Double) -> String {
+        "\(value.formatted(.number.precision(.fractionLength(0...2)))) gwei"
+    }
 }
 
 private struct BaseFeeTooltip: View {
