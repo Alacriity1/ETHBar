@@ -63,6 +63,7 @@ final class EthereumMetricsStore: ObservableObject {
             do {
                 for try await nextMetrics in provider.subscribeToMetrics() {
                     metrics = nextMetrics
+                    appendLiveHistoryPoint(from: nextMetrics)
                     isLoading = false
                     ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
                 }
@@ -95,6 +96,34 @@ final class EthereumMetricsStore: ObservableObject {
         } catch {
             ETHBarLog.debug("History cache load failed: \(error.localizedDescription)", category: .store)
         }
+    }
+
+    private func appendLiveHistoryPoint(from metrics: EthereumMetrics) {
+        guard metrics.blockNumber > 0,
+              metrics.baseFeeGwei > 0 else {
+            return
+        }
+
+        let livePoint = ChainMetricPoint(
+            blockNumber: metrics.blockNumber,
+            timestamp: metrics.updatedAt,
+            baseFeeGwei: metrics.baseFeeGwei,
+            gasUsedRatio: metrics.gasUsedPercent
+        )
+        var updatedPoints = history.points.filter { $0.blockNumber != livePoint.blockNumber }
+        updatedPoints.append(livePoint)
+        updatedPoints.sort { $0.blockNumber < $1.blockNumber }
+
+        if let latestBlockNumber = updatedPoints.last?.blockNumber {
+            let oldestRetainedBlockNumber = latestBlockNumber - ChainMetricHistoryCache.defaultRetainedBlockCount + 1
+            updatedPoints.removeAll { $0.blockNumber < oldestRetainedBlockNumber }
+        }
+
+        history = ChainMetricHistory(
+            chainID: history.chainID,
+            networkName: history.networkName,
+            points: updatedPoints
+        )
     }
 
     private static let gweiFormatter: NumberFormatter = {
