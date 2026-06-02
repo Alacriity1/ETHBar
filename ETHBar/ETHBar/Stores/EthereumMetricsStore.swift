@@ -81,6 +81,28 @@ final class EthereumMetricsStore: ObservableObject {
         liveUpdatesTask = nil
     }
 
+    func stopAndSaveCurrentHistory() async {
+        stopLiveUpdates()
+        await saveCurrentHistory()
+    }
+
+    func saveCurrentHistory() async {
+        let historySnapshot = history
+
+        do {
+            try await historyCache.saveHistory(historySnapshot)
+            ETHBarLog.debug(
+                "Saved \(historySnapshot.points.count) history points before quit",
+                category: .store
+            )
+        } catch {
+            ETHBarLog.debug(
+                "History save before quit failed: \(error.localizedDescription)",
+                category: .store
+            )
+        }
+    }
+
     private func loadCachedHistory() async {
         do {
             let cachedHistory = try await historyCache.loadHistory()

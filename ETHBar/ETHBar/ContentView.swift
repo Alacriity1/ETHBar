@@ -27,7 +27,10 @@ struct ContentView: View {
             Divider()
 
             Button("Quit") {
-                NSApplication.shared.terminate(nil)
+                Task { @MainActor in
+                    await store.stopAndSaveCurrentHistory()
+                    NSApplication.shared.terminate(nil)
+                }
             }
         }
         .padding(18)
