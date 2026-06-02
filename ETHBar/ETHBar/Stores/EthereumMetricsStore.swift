@@ -1,8 +1,8 @@
 import Combine
 import Foundation
 
-//app state layer
-//Purpose: keep async loading, errors, formatting, and observable UI state out of the provider and out of the view. The view just observes the store.
+// App state layer. Keeps async loading, errors, formatting, and observable UI state
+// out of the provider and out of the view.
 
 @MainActor
 final class EthereumMetricsStore: ObservableObject {
@@ -63,7 +63,7 @@ final class EthereumMetricsStore: ObservableObject {
             do {
                 for try await nextMetrics in provider.subscribeToMetrics() {
                     metrics = nextMetrics
-                    appendLiveHistoryPoint(from: nextMetrics)
+                    await appendLiveHistoryPoint(from: nextMetrics)
                     isLoading = false
                     ETHBarLog.debug("Live metrics received: \(nextMetrics)", category: .store)
                 }
@@ -86,7 +86,7 @@ final class EthereumMetricsStore: ObservableObject {
         await saveCurrentHistory()
     }
 
-    func saveCurrentHistory() async {
+    private func saveCurrentHistory() async {
         let historySnapshot = history
 
         do {
@@ -120,7 +120,7 @@ final class EthereumMetricsStore: ObservableObject {
         }
     }
 
-    private func appendLiveHistoryPoint(from metrics: EthereumMetrics) {
+    private func appendLiveHistoryPoint(from metrics: EthereumMetrics) async {
         guard metrics.blockNumber > 0,
               metrics.baseFeeGwei > 0 else {
             return
@@ -132,19 +132,9 @@ final class EthereumMetricsStore: ObservableObject {
             baseFeeGwei: metrics.baseFeeGwei,
             gasUsedRatio: metrics.gasUsedPercent
         )
-        var updatedPoints = history.points.filter { $0.blockNumber != livePoint.blockNumber }
-        updatedPoints.append(livePoint)
-        updatedPoints.sort { $0.blockNumber < $1.blockNumber }
-
-        if let latestBlockNumber = updatedPoints.last?.blockNumber {
-            let oldestRetainedBlockNumber = latestBlockNumber - ChainMetricHistoryCache.defaultRetainedBlockCount + 1
-            updatedPoints.removeAll { $0.blockNumber < oldestRetainedBlockNumber }
-        }
-
-        history = ChainMetricHistory(
-            chainID: history.chainID,
-            networkName: history.networkName,
-            points: updatedPoints
+        history = await historyCache.mergedHistory(
+            existingHistory: history,
+            newPoints: [livePoint]
         )
     }
 
@@ -155,10 +145,9 @@ final class EthereumMetricsStore: ObservableObject {
         formatter.numberStyle = .decimal
         return formatter
     }()
-    
-//    Missing older part of target window -> Fetch whole 7-day target window.
-//    Otherwise, only missing newest blocks -> Fetch just newest missing blocks.
-//    Already covers target window -> Fetch nothing.
+    // Missing older part of target window -> fetch whole 7-day target window.
+    // Otherwise, only missing newest blocks -> fetch newest missing blocks.
+    // Already covers target window -> fetch nothing.
     private func syncHistory() async {
         do {
             guard !Task.isCancelled else {
@@ -169,7 +158,7 @@ final class EthereumMetricsStore: ObservableObject {
             let targetBlockCount = ChainMetricHistoryCache.defaultRetainedBlockCount
             let targetStartBlock = max(0, currentHead - targetBlockCount + 1)
 
-            let fetchStartBlock: Int //optimize later, I think blocks "near' the first and last block should be fine
+            let fetchStartBlock: Int
             if let firstBlock = history.firstBlockNumber,
                let lastBlock = history.lastBlockNumber {
                 let needsOlderHistory = firstBlock > targetStartBlock

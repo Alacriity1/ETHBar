@@ -50,7 +50,6 @@ struct BaseFeeHistoryView: View {
                         Text(window.label)
                     }
                 }
-                .buttonStyle(.plain)
             }
         } label: {
             HStack(spacing: 4) {
@@ -461,11 +460,13 @@ private struct BaseFeeSummary {
 
 private enum BaseFeeHistoryWindow: CaseIterable, Identifiable {
     case sevenDays
-    case oneDay
+    case twentyFourHours
     case sixHours
     case oneHour
     case thirtyMinutes
     case fiveMinutes
+
+    private static let approximateBlocksPerHour = 300
 
     var id: Self {
         self
@@ -475,7 +476,7 @@ private enum BaseFeeHistoryWindow: CaseIterable, Identifiable {
         switch self {
         case .sevenDays:
             "7d"
-        case .oneDay:
+        case .twentyFourHours:
             "24h"
         case .sixHours:
             "6h"
@@ -492,16 +493,16 @@ private enum BaseFeeHistoryWindow: CaseIterable, Identifiable {
         switch self {
         case .sevenDays:
             nil
-        case .oneDay:
-            7_200
+        case .twentyFourHours:
+            Self.approximateBlocksPerHour * 24
         case .sixHours:
-            1_800
+            Self.approximateBlocksPerHour * 6
         case .oneHour:
-            300
+            Self.approximateBlocksPerHour
         case .thirtyMinutes:
-            150
+            Self.approximateBlocksPerHour / 2
         case .fiveMinutes:
-            25
+            Self.approximateBlocksPerHour / 12
         }
     }
 }
