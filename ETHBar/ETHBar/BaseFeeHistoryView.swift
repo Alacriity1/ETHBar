@@ -4,25 +4,31 @@ struct BaseFeeHistoryView: View {
     let points: [ChainMetricPoint]
 
     @State private var highlightedBucket: HighlightedBaseFeeBucket?
+    @State private var selectedWindow: BaseFeeHistoryWindow = .sevenDays
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
             chart
         }
+        .onChange(of: selectedWindow) {
+            highlightedBucket = nil
+        }
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Label {
-                Text("Price")
-                    .font(.subheadline)
+                Text("Gas price")
+                    .font(.headline)
                     .fontWeight(.bold)
             } icon: {
                 Image(systemName: "fuelpump")
-                    .font(.caption)
+                    .font(.subheadline)
             }
             .foregroundStyle(.primary)
+
+            windowMenu
 
             Spacer()
 
@@ -32,9 +38,47 @@ struct BaseFeeHistoryView: View {
         }
     }
 
+    private var windowMenu: some View {
+        Menu {
+            ForEach(BaseFeeHistoryWindow.allCases) { window in
+                Button {
+                    selectedWindow = window
+                } label: {
+                    if window == selectedWindow {
+                        Label(window.label, systemImage: "checkmark")
+                    } else {
+                        Text(window.label)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(selectedWindow.label)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(.primary.opacity(0.28), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .controlSize(.small)
+    }
+
     @ViewBuilder
     private var chart: some View {
-        if points.isEmpty {
+        if visiblePoints.isEmpty {
             ZStack {
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(.secondary.opacity(0.16), lineWidth: 1)
@@ -79,7 +123,16 @@ struct BaseFeeHistoryView: View {
     }
 
     private var summary: BaseFeeSummary? {
-        Self.summary(from: points)
+        Self.summary(from: visiblePoints)
+    }
+
+    private var visiblePoints: [ChainMetricPoint] {
+        guard let approximateBlockCount = selectedWindow.approximateBlockCount,
+              points.count > approximateBlockCount else {
+            return points
+        }
+
+        return Array(points.suffix(approximateBlockCount))
     }
 
     private func drawChart(context: GraphicsContext, size: CGSize) {
@@ -102,7 +155,7 @@ struct BaseFeeHistoryView: View {
 
     private func chartModel(size: CGSize) -> BaseFeeChartModel? {
         let buckets = Self.buckets(
-            from: points,
+            from: visiblePoints,
             targetCount: max(1, Int(size.width / 2))
         )
 
@@ -406,6 +459,53 @@ private struct BaseFeeSummary {
     let lowBaseFeeGwei: Double
 }
 
+private enum BaseFeeHistoryWindow: CaseIterable, Identifiable {
+    case sevenDays
+    case oneDay
+    case sixHours
+    case oneHour
+    case thirtyMinutes
+    case fiveMinutes
+
+    var id: Self {
+        self
+    }
+
+    var label: String {
+        switch self {
+        case .sevenDays:
+            "7d"
+        case .oneDay:
+            "24h"
+        case .sixHours:
+            "6h"
+        case .oneHour:
+            "1h"
+        case .thirtyMinutes:
+            "30m"
+        case .fiveMinutes:
+            "5m"
+        }
+    }
+
+    var approximateBlockCount: Int? {
+        switch self {
+        case .sevenDays:
+            nil
+        case .oneDay:
+            7_200
+        case .sixHours:
+            1_800
+        case .oneHour:
+            300
+        case .thirtyMinutes:
+            150
+        case .fiveMinutes:
+            25
+        }
+    }
+}
+
 private struct BaseFeeHeaderStats: View {
     let summary: BaseFeeSummary
 
@@ -423,20 +523,20 @@ private struct BaseFeeHeaderStats: View {
                     .monospacedDigit()
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                stat(label: "avg", value: summary.averageBaseFeeGwei)
-                stat(label: "low", value: summary.lowBaseFeeGwei)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                compactStat(label: "avg", value: summary.averageBaseFeeGwei)
+                compactStat(label: "low", value: summary.lowBaseFeeGwei)
             }
         }
     }
 
-    private func stat(label: String, value: Double) -> some View {
+    private func compactStat(label: String, value: Double) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            Text(format(value))
+            Text(formatValue(value))
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -448,6 +548,10 @@ private struct BaseFeeHeaderStats: View {
 
     private func format(_ value: Double) -> String {
         "\(value.formatted(.number.precision(.fractionLength(0...2)))) gwei"
+    }
+
+    private func formatValue(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)))
     }
 }
 
