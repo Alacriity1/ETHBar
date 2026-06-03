@@ -14,6 +14,10 @@ struct ContentView: View {
 
             Divider()
 
+            GasUsageHistoryView(points: store.history.points)
+
+            Divider()
+
             MetricRow(title: "Base fee", value: baseFeeText, systemImage: "fuelpump")
             MetricRow(title: "Block", value: blockNumberText, systemImage: "cube")
             MetricRow(title: "Gas used", value: gasUsedText, systemImage: "gauge.with.dots.needle.bottom.50percent")
@@ -57,7 +61,7 @@ struct ContentView: View {
 
     private var baseFeeText: String {
         guard store.metrics.baseFeeGwei > 0 else {
-            return store.isLoading ? "Loading" : "--"
+            return store.isLoading ? "Awaiting next block" : "--"
         }
 
         return "\(store.metrics.baseFeeGwei.formatted(.number.precision(.fractionLength(0...3)))) gwei"
