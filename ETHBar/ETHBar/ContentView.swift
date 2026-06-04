@@ -40,7 +40,15 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: 8) {
+            Image("EthereumLogo")
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 17, height: 22)
+                .foregroundStyle(.primary.opacity(0.72))
+                .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text("ETHBar")
                     .font(.headline)
