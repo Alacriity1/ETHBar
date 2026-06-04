@@ -11,7 +11,6 @@ struct GasUsageHistoryView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             chart
-            legend
         }
         .onChange(of: selectedWindow) {
             highlightedBucket = nil
@@ -135,17 +134,6 @@ struct GasUsageHistoryView: View {
                 }
             }
             .frame(height: 108)
-        }
-    }
-
-    @ViewBuilder
-    private var legend: some View {
-        HStack(spacing: 10) {
-            GasUsageLegendItem(color: Self.spareColor.opacity(0.82), text: "spare")
-            GasUsageLegendItem(color: Self.pressureColor.opacity(0.82), text: "over")
-            GasUsageLegendItem(color: Self.hotColor.opacity(0.82), text: "hot")
-
-            Spacer(minLength: 6)
         }
     }
 
@@ -433,7 +421,7 @@ struct GasUsageHistoryView: View {
     }
 
     private static let targetGasRatio = 0.5
-    private static let hotGasRatio = 0.9
+    fileprivate static let hotGasRatio = 0.9
     fileprivate static let spareColor = Color(red: 0.17, green: 0.78, blue: 0.9)
     fileprivate static let pressureColor = Color(red: 1, green: 0.55, blue: 0.18)
     fileprivate static let hotColor = Color(red: 1, green: 0.18, blue: 0.42)
@@ -506,77 +494,69 @@ private enum GasUsageHistoryWindow: CaseIterable, Identifiable {
     }
 }
 
-private struct GasUsageLegendItem: View {
-    let color: Color
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-
-            Text(text)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-    }
-}
-
 private struct GasUsageHelpPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             GasUsageHelpRow(
                 color: GasUsageHistoryView.spareColor,
-                label: "spare",
                 detail: "Avg usage below Ethereum's 50% target."
             )
             GasUsageHelpRow(
                 color: GasUsageHistoryView.pressureColor,
-                label: "over",
                 detail: "Avg usage above the 50% target."
             )
             GasUsageHelpRow(
                 color: GasUsageHistoryView.hotColor,
-                label: "hot",
                 detail: "Share of blocks at 90%+ usage."
             )
-            GasUsageHelpRow(
-                color: .secondary,
-                label: "above",
-                detail: "Hover value: share of blocks above target."
-            )
+
+            Divider()
+                .padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                GasUsageHelpValue(label: "avg", detail: "average gas usage")
+                GasUsageHelpValue(label: "above", detail: "blocks above target")
+                GasUsageHelpValue(label: "peaked", detail: "blocks at 90%+ usage")
+            }
         }
         .padding(10)
-        .frame(width: 230, alignment: .leading)
+        .frame(width: 220, alignment: .leading)
     }
 }
 
 private struct GasUsageHelpRow: View {
     let color: Color
-    let label: String
     let detail: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Circle()
                 .fill(color.opacity(0.86))
                 .frame(width: 7, height: 7)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
 
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+private struct GasUsageHelpValue: View {
+    let label: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 }
@@ -589,7 +569,7 @@ private struct GasUsageTooltip: View {
             if bucket.pointCount > 1 {
                 stat(label: "avg", value: bucket.averageGasRatio)
                 stat(label: "above", value: bucket.aboveTargetShare)
-                stat(label: "hot", value: bucket.hotBlockShare)
+                stat(label: "peaked", value: bucket.hotBlockShare)
             } else {
                 stat(label: "gas", value: bucket.averageGasRatio)
             }
