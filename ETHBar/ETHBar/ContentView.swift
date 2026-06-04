@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var store: EthereumMetricsStore
+    @State private var isHoveringQuit = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -32,12 +33,7 @@ struct ContentView: View {
 
             Divider()
 
-            Button("Quit") {
-                Task { @MainActor in
-                    await store.stopAndSaveCurrentHistory()
-                    NSApplication.shared.terminate(nil)
-                }
-            }
+            footer
         }
         .padding(18)
         .frame(width: 320)
@@ -54,10 +50,37 @@ struct ContentView: View {
             }
 
             Spacer()
+        }
+    }
 
-            Text(lastUpdatedText)
+    private var footer: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(updateStatusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button("Quit") {
+                Task { @MainActor in
+                    await store.stopAndSaveCurrentHistory()
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(isHoveringQuit ? .primary : .secondary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(.primary.opacity(isHoveringQuit ? 0.08 : 0.035), in: RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(.primary.opacity(isHoveringQuit ? 0.34 : 0.16), lineWidth: 1)
+            }
+            .onHover { isHoveringQuit = $0 }
+            .accessibilityLabel("Quit ETHBar")
+            .help("Quit ETHBar")
         }
     }
 
@@ -93,16 +116,16 @@ struct ContentView: View {
         return store.metrics.gasUsedPercent.formatted(.percent.precision(.fractionLength(0...1)))
     }
 
-    private var lastUpdatedText: String {
+    private var updateStatusText: String {
         if store.isLoading {
-            return "Updating"
+            return "--"
         }
 
         guard store.metrics.sourceName != "Not loaded" else {
-            return "Not loaded"
+            return "--"
         }
 
-        return store.metrics.updatedAt.formatted(date: .omitted, time: .shortened)
+        return "Updated \(store.metrics.updatedAt.formatted(date: .omitted, time: .shortened))"
     }
 }
 
