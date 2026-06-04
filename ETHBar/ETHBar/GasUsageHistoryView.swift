@@ -4,7 +4,7 @@ struct GasUsageHistoryView: View {
     let points: [ChainMetricPoint]
 
     @State private var highlightedBucket: HighlightedGasUsageBucket?
-    @State private var selectedWindow: GasUsageHistoryWindow = .twentyFourHours
+    @State private var selectedWindow: GasUsageHistoryWindow = .oneHour
     @State private var isShowingHelp = false
 
     var body: some View {
@@ -35,10 +35,6 @@ struct GasUsageHistoryView: View {
             helpIcon
 
             Spacer()
-
-            if let summary {
-                GasUsageHeaderStats(summary: summary)
-            }
         }
     }
 
@@ -144,27 +140,13 @@ struct GasUsageHistoryView: View {
 
     @ViewBuilder
     private var legend: some View {
-        if let summary {
-            HStack(spacing: 10) {
-                GasUsageLegendItem(color: Self.spareColor.opacity(0.82), text: "spare")
-                GasUsageLegendItem(color: Self.pressureColor.opacity(0.82), text: "over")
-                GasUsageLegendItem(color: Self.hotColor.opacity(0.82), text: "hot")
+        HStack(spacing: 10) {
+            GasUsageLegendItem(color: Self.spareColor.opacity(0.82), text: "spare")
+            GasUsageLegendItem(color: Self.pressureColor.opacity(0.82), text: "over")
+            GasUsageLegendItem(color: Self.hotColor.opacity(0.82), text: "hot")
 
-                Spacer(minLength: 6)
-
-                Text("over \(Self.percentText(summary.aboveTargetShare))")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
+            Spacer(minLength: 6)
         }
-    }
-
-    private var summary: GasUsageSummary? {
-        Self.summary(from: visiblePoints)
     }
 
     private var visiblePoints: [ChainMetricPoint] {
@@ -403,28 +385,6 @@ struct GasUsageHistoryView: View {
         yPosition(for: targetGasRatio, height: height)
     }
 
-    private static func summary(from points: [ChainMetricPoint]) -> GasUsageSummary? {
-        let gasRatios = points
-            .map(\.gasUsedRatio)
-            .filter { $0 >= 0 }
-
-        guard let latestGasRatio = gasRatios.last,
-              !gasRatios.isEmpty else {
-            return nil
-        }
-
-        let averageGasRatio = gasRatios.reduce(0, +) / Double(gasRatios.count)
-        let aboveTargetCount = gasRatios.filter { $0 > targetGasRatio }.count
-        let hotBlockCount = gasRatios.filter { $0 >= hotGasRatio }.count
-
-        return GasUsageSummary(
-            latestGasRatio: latestGasRatio,
-            averageGasRatio: averageGasRatio,
-            aboveTargetShare: Double(aboveTargetCount) / Double(gasRatios.count),
-            hotBlockShare: Double(hotBlockCount) / Double(gasRatios.count)
-        )
-    }
-
     private static func buckets(
         from points: [ChainMetricPoint],
         targetCount: Int
@@ -472,20 +432,11 @@ struct GasUsageHistoryView: View {
         }
     }
 
-    private static func percentText(_ ratio: Double) -> String {
-        ratio.formatted(.percent.precision(.fractionLength(0...1)))
-    }
-
     private static let targetGasRatio = 0.5
     private static let hotGasRatio = 0.9
     fileprivate static let spareColor = Color(red: 0.17, green: 0.78, blue: 0.9)
     fileprivate static let pressureColor = Color(red: 1, green: 0.55, blue: 0.18)
     fileprivate static let hotColor = Color(red: 1, green: 0.18, blue: 0.42)
-    private static let helpText = """
-    spare: average gas usage below Ethereum's 50% target.
-    over: average gas usage above the 50% target.
-    hot: share of blocks at 90%+ gas usage.
-    """
 }
 
 private struct GasUsageBucket {
@@ -504,13 +455,6 @@ private struct GasUsageChartModel {
 private struct HighlightedGasUsageBucket {
     let bucket: GasUsageBucket
     let position: CGPoint
-}
-
-private struct GasUsageSummary {
-    let latestGasRatio: Double
-    let averageGasRatio: Double
-    let aboveTargetShare: Double
-    let hotBlockShare: Double
 }
 
 private enum GasUsageHistoryWindow: CaseIterable, Identifiable {
@@ -562,51 +506,6 @@ private enum GasUsageHistoryWindow: CaseIterable, Identifiable {
     }
 }
 
-private struct GasUsageHeaderStats: View {
-    let summary: GasUsageSummary
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("now")
-                    .font(.caption2)
-                    .foregroundStyle(.primary)
-
-                Text(format(summary.latestGasRatio))
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.primary)
-                    .monospacedDigit()
-            }
-
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                compactStat(label: "avg", value: summary.averageGasRatio)
-                compactStat(label: "hot", value: summary.hotBlockShare)
-            }
-        }
-    }
-
-    private func compactStat(label: String, value: Double) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            Text(format(value))
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
-
-    private func format(_ ratio: Double) -> String {
-        ratio.formatted(.percent.precision(.fractionLength(0...1)))
-    }
-}
-
 private struct GasUsageLegendItem: View {
     let color: Color
     let text: String
@@ -645,9 +544,14 @@ private struct GasUsageHelpPopover: View {
                 label: "hot",
                 detail: "Share of blocks at 90%+ usage."
             )
+            GasUsageHelpRow(
+                color: .secondary,
+                label: "above",
+                detail: "Hover value: share of blocks above target."
+            )
         }
         .padding(10)
-        .frame(width: 220, alignment: .leading)
+        .frame(width: 230, alignment: .leading)
     }
 }
 
@@ -684,7 +588,7 @@ private struct GasUsageTooltip: View {
         VStack(alignment: .leading, spacing: 2) {
             if bucket.pointCount > 1 {
                 stat(label: "avg", value: bucket.averageGasRatio)
-                stat(label: "over", value: bucket.aboveTargetShare)
+                stat(label: "above", value: bucket.aboveTargetShare)
                 stat(label: "hot", value: bucket.hotBlockShare)
             } else {
                 stat(label: "gas", value: bucket.averageGasRatio)
