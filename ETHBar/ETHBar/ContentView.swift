@@ -18,9 +18,11 @@ struct ContentView: View {
 
             Divider()
 
-            MetricRow(title: "Base fee", value: baseFeeText, systemImage: "fuelpump")
-            MetricRow(title: "Block", value: blockNumberText, systemImage: "cube")
-            MetricRow(title: "Gas used", value: gasUsedText, systemImage: "gauge.with.dots.needle.bottom.50percent")
+            CurrentBlockSection(
+                blockNumber: blockNumberText,
+                baseFee: compactBaseFeeText,
+                gasUsed: gasUsedText
+            )
 
             if let errorMessage = store.errorMessage {
                 Text(errorMessage)
@@ -67,9 +69,17 @@ struct ContentView: View {
         return "\(store.metrics.baseFeeGwei.formatted(.number.precision(.fractionLength(0...3)))) gwei"
     }
 
+    private var compactBaseFeeText: String {
+        guard store.metrics.baseFeeGwei > 0 else {
+            return "--"
+        }
+
+        return baseFeeText
+    }
+
     private var blockNumberText: String {
         guard store.metrics.blockNumber > 0 else {
-            return "--"
+            return store.isLoading ? "Awaiting" : "--"
         }
 
         return store.metrics.blockNumber.formatted()
@@ -96,27 +106,78 @@ struct ContentView: View {
     }
 }
 
-private struct MetricRow: View {
-    let title: String
-    let value: String
-    let systemImage: String
+private struct CurrentBlockSection: View {
+    let blockNumber: String
+    let baseFee: String
+    let gasUsed: String
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .frame(width: 18)
-                .foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Label {
+                    Text("Current block")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                } icon: {
+                    Image(systemName: "cube")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(.primary)
 
+                Spacer()
+
+                Text(blockNumber)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            HStack(spacing: 10) {
+                CurrentBlockMetric(
+                    title: "Base fee",
+                    value: baseFee
+                )
+
+                CurrentBlockMetric(
+                    title: "Gas used",
+                    value: gasUsed
+                )
+            }
+            .frame(height: 68)
+        }
+    }
+}
+
+private struct CurrentBlockMetric: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
             Text(title)
+                .font(.caption)
+                .fontWeight(.bold)
                 .foregroundStyle(.secondary)
 
-            Spacer()
-
             Text(value)
-                .fontWeight(.semibold)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.primary)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
         }
-        .font(.body)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(.primary.opacity(0.12), lineWidth: 1)
+        }
     }
 }
 
