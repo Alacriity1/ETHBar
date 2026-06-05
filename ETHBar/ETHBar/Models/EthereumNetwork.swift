@@ -2,7 +2,7 @@ import Foundation
 
 //defines chain/network config
 
-struct EthereumNetwork: Equatable {
+nonisolated struct EthereumNetwork: Equatable {
     let name: String
     let chainID: Int
     let httpURL: URL
@@ -10,7 +10,7 @@ struct EthereumNetwork: Equatable {
 }
 
 extension EthereumNetwork {
-    static let mainnet = EthereumNetwork(
+    nonisolated static let mainnet = EthereumNetwork(
         name: "Ethereum Mainnet",
         chainID: 1,
         httpURL: URL(string: "https://ethereum-rpc.publicnode.com")!,

@@ -1,6 +1,6 @@
 import Foundation
 
-struct ChainMetricHistory: Codable, Equatable, Identifiable {
+nonisolated struct ChainMetricHistory: Codable, Equatable, Identifiable {
     let chainID: Int
     let networkName: String
     var points: [ChainMetricPoint]
@@ -18,7 +18,7 @@ struct ChainMetricHistory: Codable, Equatable, Identifiable {
     }
 }
 
-struct ChainMetricPoint: Codable, Equatable, Identifiable {
+nonisolated struct ChainMetricPoint: Codable, Equatable, Identifiable {
     let blockNumber: Int
     let timestamp: Date?
     let baseFeeGwei: Double
@@ -28,4 +28,3 @@ struct ChainMetricPoint: Codable, Equatable, Identifiable {
         blockNumber
     }
 }
-
