@@ -49,15 +49,17 @@ struct ContentView: View {
                 .foregroundStyle(.primary.opacity(0.72))
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ETHBar")
-                    .font(.headline)
-                Text(store.metrics.networkName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            Text("ETHBar")
+                .font(.title3)
+                .fontWeight(.bold)
 
             Spacer()
+
+            Text(store.metrics.networkName)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 
