@@ -8,7 +8,12 @@ struct ETHBarApp: App {
         MenuBarExtra {
             ContentView(store: metricsStore)
         } label: {
-            Label(metricsStore.menuBarTitle, systemImage: "bolt.circle")
+            Label {
+                Text(metricsStore.menuBarTitle)
+            } icon: {
+                Image("EthereumMenuBarLogo")
+                    .renderingMode(.template)
+            }
         }
         .menuBarExtraStyle(.window)
     }
