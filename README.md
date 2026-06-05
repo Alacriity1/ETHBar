@@ -4,7 +4,7 @@ ETHBar is a tiny macOS menu bar app for keeping Ethereum Mainnet in view.
 
 It shows the live base fee in the menu bar, then opens into a compact popover with fee history, gas usage, the latest block, and last update time.
 
-![ETHBar screenshot](public/ETHBar.png)
+<img src="public/ETHBar.png" alt="ETHBar screenshot" width="300" />
 
 ## What it does
 
